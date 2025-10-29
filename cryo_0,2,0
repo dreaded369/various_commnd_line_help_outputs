@@ -1,0 +1,172 @@
+cryo extracts blockchain data to parquet, csv, or json
+
+Usage: cryo [OPTIONS] [DATATYPE]...
+
+Arguments:
+  [DATATYPE]...  datatype(s) to collect, use cryo datasets to see all available
+
+Options:
+      --remember    Remember current command for future use
+  -v, --verbose     Extra verbosity
+      --no-verbose  Run quietly without printing information to stdout
+  -h, --help        Print help
+  -V, --version     Print version
+
+Content Options:
+  -b, --blocks <BLOCKS>...           Block numbers, see syntax below
+      --timestamps <TIMESTAMPS>...   Timestamp numbers in unix, overridden by blocks
+  -t, --txs <TXS>...                 Transaction hashes, see syntax below
+  -a, --align                        Align chunk boundaries to regular intervals,
+                                     e.g. (1000 2000 3000), not (1106 2106 3106)
+      --reorg-buffer <N_BLOCKS>      Reorg buffer, save blocks only when this old,
+                                     can be a number of blocks [default: 0]
+  -i, --include-columns [<COLS>...]  Columns to include alongside the defaults,
+                                     use `all` to include all available columns
+  -e, --exclude-columns [<COLS>...]  Columns to exclude from the defaults
+      --columns [<COLS>...]          Columns to use instead of the defaults,
+                                     use `all` to use all available columns
+      --u256-types <U256_TYPES>...   Set output datatype(s) of U256 integers
+                                     [default: binary, string, f64]
+      --hex                          Use hex string encoding for binary columns
+  -s, --sort [<SORT>...]             Columns(s) to sort by, `none` for unordered
+      --exclude-failed               Exclude items from failed transactions
+
+Source Options:
+  -r, --rpc <RPC>                    RPC url [default: ETH_RPC_URL env var]
+      --network-name <NETWORK_NAME>  Network name [default: name of eth_getChainId]
+
+Acquisition Options:
+  -l, --requests-per-second <limit>  Ratelimit on requests per second
+      --max-retries <R>              Max retries for provider errors [default: 5]
+      --initial-backoff <B>          Initial retry backoff time (ms) [default: 500]
+      --max-concurrent-requests <M>  Global number of concurrent requests
+      --max-concurrent-chunks <M>    Number of chunks processed concurrently
+      --chunk-order <CHUNK_ORDER>    Chunk collection order (normal, reverse, or random)
+  -d, --dry                          Dry run, collect no data
+
+Output Options:
+  -c, --chunk-size <CHUNK_SIZE>      Number of blocks per file [default: 1000]
+      --n-chunks <N_CHUNKS>          Number of files (alternative to --chunk-size)
+      --partition-by <PARTITION_BY>  Dimensions to partition by
+  -o, --output-dir <OUTPUT_DIR>      Directory for output files [default: .]
+      --subdirs <SUBDIRS>...         Subdirectories for output files
+                                     can be `datatype`, `network`, or custom string
+      --label <LABEL>                Label to add to each filename
+      --overwrite                    Overwrite existing files instead of skipping
+      --csv                          Save as csv instead of parquet
+      --json                         Save as json instead of parquet
+      --row-group-size <GROUP_SIZE>  Number of rows per row group in parquet file
+      --n-row-groups <N_ROW_GROUPS>  Number of rows groups in parquet file
+      --no-stats                     Do not write statistics to parquet files
+      --compression <NAME [#]>...    Compression algorithm and level [default: lz4]
+      --report-dir <REPORT_DIR>      Directory to save summary report
+                                     [default: {output_dir}/.cryo/reports]
+      --no-report                    Avoid saving a summary report
+
+Dataset-specific Options:
+      --address <ADDRESS>...         Address(es)
+      --to-address <address>...      To Address(es)
+      --from-address <address>...    From Address(es)
+      --call-data <CALL_DATA>...     Call data(s) to use for eth_calls
+      --function <FUNCTION>...       Function(s) to use for eth_calls
+      --inputs <INPUTS>...           Input(s) to use for eth_calls
+      --slot <SLOT>...               Slot(s)
+      --contract <CONTRACT>...       Contract address(es)
+      --topic0 <TOPIC0>...           Topic0(s) [aliases: event]
+      --topic1 <TOPIC1>...           Topic1(s)
+      --topic2 <TOPIC2>...           Topic2(s)
+      --topic3 <TOPIC3>...           Topic3(s)
+      --event-signature <SIG>...     Event signature for log decoding
+      --inner-request-size <BLOCKS>  Blocks per request (eth_getLogs) [default: 1]
+      --js-tracer <tracer>           Event signature for log decoding
+
+Optional Subcommands:
+      cryo help                      display help message
+      cryo help syntax               display block + tx specification syntax
+      cryo help datasets             display list of all datasets
+      cryo help <DATASET(S)>         display info about a dataset
+cryo syntax
+(output of cryo help syntax)
+
+Block specification syntax
+- can use numbers                    --blocks 5000 6000 7000
+- can use ranges                     --blocks 12M:13M 15M:16M
+- can use a parquet file             --blocks ./path/to/file.parquet[:COLUMN_NAME]
+- can use multiple parquet files     --blocks ./path/to/files/*.parquet[:COLUMN_NAME]
+- numbers can contain { _ . K M B }  5_000 5K 15M 15.5M
+- omitting range end means latest    15.5M: == 15.5M:latest
+- omitting range start means 0       :700 == 0:700
+- minus on start means minus end     -1000:7000 == 6001:7001
+- plus sign on end means plus start  15M:+1000 == 15M:15.001M
+- can use every nth value            2000:5000:1000 == 2000 3000 4000
+- can use n values total             100:200/5 == 100 124 149 174 199
+
+Timestamp specification syntax
+- can use numbers                    --timestamp 5000 6000 7000
+- can use ranges                     --timestamp 12M:13M 15M:16M
+- can use a parquet file             --timestamp ./path/to/file.parquet[:COLUMN_NAME]
+- can use multiple parquet files     --timestamp ./path/to/files/*.parquet[:COLUMN_NAME]
+- can contain { _ . m h d w M y }    31_536_000 525600m 8760h 365d 52.143w 12.17M 1y
+- omitting range end means latest    15.5M: == 15.5M:latest
+- omitting range start means 0       :700 == 0:700
+- minus on start means minus end     -1000:7000 == 6001:7001
+- plus sign on end means plus start  15M:+1000 == 15M:15.001M
+- can use n values total             100:200/5 == 100 124 149 174 199
+
+Transaction specification syntax
+- can use transaction hashes         --txs TX_HASH1 TX_HASH2 TX_HASH3
+- can use a parquet file             --txs ./path/to/file.parquet[:COLUMN_NAME]
+                                     (default column name is transaction_hash)
+- can use multiple parquet files     --txs ./path/to/ethereum__logs*.parquet
+cryo datasets
+(output of cryo help datasets)
+
+cryo datasets
+─────────────
+- address_appearances
+- balance_diffs
+- balance_reads
+- balances
+- blocks
+- code_diffs
+- code_reads
+- codes
+- contracts
+- erc20_balances
+- erc20_metadata
+- erc20_supplies
+- erc20_transfers
+- erc20_approvals
+- erc721_metadata
+- erc721_transfers
+- eth_calls
+- four_byte_counts (alias = 4byte_counts)
+- geth_calls
+- geth_code_diffs
+- geth_balance_diffs
+- geth_storage_diffs
+- geth_nonce_diffs
+- geth_opcodes
+- javascript_traces (alias = js_traces)
+- logs (alias = events)
+- native_transfers
+- nonce_diffs
+- nonce_reads
+- nonces
+- slots (alias = storages)
+- storage_diffs (alias = slot_diffs)
+- storage_reads (alias = slot_reads)
+- traces
+- trace_calls
+- transactions (alias = txs)
+- vm_traces (alias = opcode_traces)
+
+dataset group names
+───────────────────
+- blocks_and_transactions: blocks, transactions
+- call_trace_derivatives: contracts, native_transfers, traces
+- geth_state_diffs: geth_balance_diffs, geth_code_diffs, geth_nonce_diffs, geth_storage_diffs
+- state_diffs: balance_diffs, code_diffs, nonce_diffs, storage_diffs
+- state_reads: balance_reads, code_reads, nonce_reads, storage_reads
+
+use cryo help <DATASET> to print info about a specific dataset
